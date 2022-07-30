@@ -1,8 +1,8 @@
 /*
- * File:   Main_18F.c
+ * File:   RS232 PIC.c
  * Author: mario
  *
- * Created on 1 de febrero de 2022, 09:47 PM
+ * Created on 30 de Julio de 2022, 07:38 AM
  */
 
 #include <xc.h>
@@ -14,24 +14,13 @@
 #pragma LVP=OFF                 //Programación de Bajo voltaje Activada
 
 #define LED_CPU LATE0           //Pin del led de CPU asociado al funcionamiento
+#define Tam_Vec 20              //Define el tamaño del Vector de recepción RS232
 
 
+char b = 0;          //Variable contadora de recepción
+char BufferR2[Tam_Vec];   //Vector de guardado de recepción
 
-
-
-
-
-
-int ax,ay,az,gx,gy,gz;          //Variables de la IMU
-int aux2,aux3 ;                      //Variable temporal
-float Ax,Ay,Az;
-float Ayz,Angx,Axz,Angy;
-char Comando, Comando2 ;
-
-char b =0;
-char BufferR2[10];
-unsigned char BufferR;          //Registro de resepción
-void ImprimirDecimal (float);   //Función para imprimir un valor decimal en el puerto serial
+void ImprimirDecimal (float); //Función para imprimir un valor decimal en el puerto serial
 void MensajeRS232(char *);    //Función para imprimir cadena de Caracteres
 
 void Transmitir(unsigned char); //Función encargada de enviar datos Seriales
@@ -41,17 +30,12 @@ unsigned char Recibir(void);    //Función encargada de Resivir datos Seriales
 void __interrupt () ISR (void); //Interrupción 
 void main(void) {
     
-    
-  //unsigned char aux;            //variables de la IMU
-  //float Ax,Ay,Az; //,gx,gy,gz;        //Variables de la IMU
+  
   OSCCON=0b01110000;            //Configuración del oscilador 
   __delay_ms(1);                //Tiempo de establecimiento para el oscilador
   TRISE=0;
-  LED_CPU=1;
   TRISD=0;
-  LATD2=1;
-  LATD3=1;
-  //LATD|=0;
+  LATD=0;
   LATD0=1;                  //lED DE ARRANQUE
   
   /* Configuración del puerto Serial*/
@@ -76,25 +60,22 @@ void main(void) {
   RCIE=1;   //Activación de la Interrupción para recepción de datos
   PEIE=1;   //Habilitaciónon de las interrupciones por periferico
   GIE=1;    //Habilitación de las interrupciones generales
+  LATD0=0;                  //lED DE ARRANQUE
   /* Comienzo del programa principal */
   LED_CPU=0;                  //lED DE ARRANQUE
   
   while(1){
-    __delay_ms(500);
+    __delay_ms(150);
     LED_CPU=1;
-    __delay_ms(500);
+    __delay_ms(150);
     LED_CPU=0;
     
         if(BufferR2[0] == 'F'){
             LATD3=0;
-            __delay_ms(1500);
-            LATD3=1;
             BufferR2[0]=0;
         }
         if(BufferR2[0] == 'O'){
-            LATD2=0;
-            __delay_ms(500);
-            LATD2=1;
+            LATD3=1;
             BufferR2[0]=0;
         }
         //RCIF = 0;
@@ -108,13 +89,8 @@ void main(void) {
         CCPR1L=0;
     }
     MensajeRS232("Comando");
-    //Transmitir(BufferR);
-    Transmitir(BufferR2[0]);
-    //Transmitir(BufferR2[1]);
-    //Transmitir(BufferR2[2]);
-    //Transmitir(BufferR2[3]);
-    //Transmitir(BufferR2[4]);
     MensajeRS232(BufferR2);
+    ImprimirDecimal(0.2);
     Transmitir('\n');
   }  
 }
@@ -124,8 +100,8 @@ void __interrupt () ISR (void){
          RCIF=0;
          BufferR2[b]=Recibir();
          b++;
-         if(BufferR2[b-1]=='\n'||b==10){ 
-             while(b!=10){
+         if(BufferR2[b-1]=='\n'||b==Tam_Vec){ 
+             while(b!=Tam_Vec){
                  BufferR2[b]=0;
                  b++;
              }
@@ -139,7 +115,11 @@ void MensajeRS232(char* a){
 //a es una cadena de caracteres guardada en una variable *char
 //Ejemplo: char aux[4]="Hola"; MensajeLCD_Var(aux);	
 	while (*a != '\0'){
-		Transmitir(*a);
+		//Transmitir(*a); 
+        if(*a != '\n'){
+          Transmitir(*a);  //En el caso de no querer enviar el salto de linea
+                           //Se puede usar esta función
+        }
 		a++;
 	}		
 }
@@ -178,10 +158,6 @@ void ImprimirDecimal (float An){
     }
     Transmitir(' ');
 }
-
-
-
-
 
 /*  Rs232 Funciones de transmición y recepción*/
 void Transmitir(unsigned char BufferT){
